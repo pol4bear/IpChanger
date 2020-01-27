@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <arpa/inet.h>
+#include "pol4b_ip.h"
 
 namespace pol4b {
 class NetworkUtil {

@@ -1,11 +1,17 @@
-#ifndef POL4B_TRANSPORT_H
-#define POL4B_TRANSPORT_H
+#pragma once
 
+#include "pol4b_ip.h"
 
-class pol4b_transport
-{
+namespace pol4b {
+class IpPortPair {
 public:
-    pol4b_transport();
-};
+    IpPortPair();
+    IpPortPair(Ip ip_in, uint16_t port_in);
 
-#endif // POL4B_TRANSPORT_H
+    Ip ip;
+    uint16_t port;
+
+public:
+    bool operator<(const IpPortPair &rhs) const;
+};
+}

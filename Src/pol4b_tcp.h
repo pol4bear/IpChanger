@@ -4,7 +4,7 @@
 #include <list>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
-#include "pol4b_ip.h"
+#include "pol4b_transport.h"
 #include "pol4b_util.h"
 
 namespace pol4b {
@@ -14,18 +14,6 @@ public:
     static tcphdr *get_tcp_header(iphdr *ip_header);
     static uint8_t *get_tcp_payload(tcphdr *tcp_header, uint8_t *packet_tail);
     static uint32_t get_tcp_payload_length(iphdr *ip_header, tcphdr *tcp_header);
-};
-
-class IpPortPair {
-public:
-    IpPortPair();
-    IpPortPair(Ip ip_in, uint16_t port_in);
-
-    Ip ip;
-    uint16_t port;
-
-public:
-    bool operator<(const IpPortPair &rhs);
 };
 
 class TcpPacket {

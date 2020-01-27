@@ -31,6 +31,7 @@ public:
     bool operator<(const Ip &rhs) const;
 
     operator std::string() const;
+    operator uint32_t() const;
 };
 
 class IpUtil {

@@ -3,7 +3,7 @@
 using namespace std;
 
 namespace pol4b {
-pol4b::Ip::Ip() {}
+pol4b::Ip::Ip() { memset(addr, 0, size); }
 
 pol4b::Ip::Ip(const Ip &ip) {
     memcpy(addr, ip.addr, size);
@@ -14,9 +14,12 @@ Ip::Ip(uint32_t addr_in) {
 }
 
 Ip::Ip(string addr_in) {
+    memset(addr, 0, size);
+
     in_addr ip;
-    inet_pton(AF_INET, addr_in.c_str(), &ip);
-    memcpy(addr, &ip.s_addr, size);
+    if(inet_pton(AF_INET, addr_in.c_str(), &ip)) {
+        memcpy(addr, &ip.s_addr, size);
+    }
 }
 
 std::string Ip::to_string() const {
@@ -45,18 +48,11 @@ bool Ip::operator==(const uint32_t &rhs) const {
     return *reinterpret_cast<const uint32_t*>(addr) == rhs;
 }
 
-bool Ip::operator==(const string &rhs) const {
+bool Ip::operator==(const string &rhs) const { return *this == Ip(rhs); }
+bool Ip::operator<(const Ip &rhs) const { return uint32_t(*this->addr) < uint32_t(*rhs.addr); }
 
-    return *this == Ip(rhs);
-}
-
-bool Ip::operator<(const Ip &rhs) const {
-    return uint32_t(*this->addr) < uint32_t(*rhs.addr);
-}
-
-Ip::operator string() const {
-    return to_string();
-}
+Ip::operator string() const { return to_string(); }
+pol4b::Ip::operator uint32_t() const { return *(uint32_t*)addr; }
 
 uint16_t IpUtil::get_ip_checksum(iphdr *ip_header){
     ip_header->check = 0;
