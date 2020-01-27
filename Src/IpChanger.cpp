@@ -31,7 +31,7 @@ int IpChanger::cb_input(nfq_q_handle *queue_handle, nfgenmsg *message, nfq_data 
     }
     else return nfq_set_verdict(queue_handle, ntohl(packet_header->packet_id), NF_ACCEPT, 0, nullptr);
 
-    if (ip_header->saddr != handle->destination.ip || *src_port != handle->destination.port) return nfq_set_verdict(queue_handle, ntohl(packet_header->packet_id), NF_ACCEPT, 0, nullptr);
+    if (ip_header->saddr != handle->destination.ip || ntohs(*src_port) != handle->destination.port) return nfq_set_verdict(queue_handle, ntohl(packet_header->packet_id), NF_ACCEPT, 0, nullptr);
     handle->flow_manager.assign_input(packet);
 
     IpPortPair origin(ip_header->saddr, ntohs(*src_port));
@@ -40,6 +40,7 @@ int IpChanger::cb_input(nfq_q_handle *queue_handle, nfgenmsg *message, nfq_data 
         ip_header->daddr = destination.ip;
         *src_port = htons(destination.port);
         ip_header->check = IpUtil::get_ip_checksum(ip_header);
+        *check = 0;
         *check = TransportUtil::get_tcp_udp_checksum(ip_header, packet + ip_header->ihl * 4, ip_header->protocol, packet_length);
     }
 
@@ -75,12 +76,12 @@ int IpChanger::cb_output(nfq_q_handle *queue_handle, nfgenmsg *message, nfq_data
     }
     else return nfq_set_verdict(queue_handle, ntohl(packet_header->packet_id), NF_ACCEPT, 0, nullptr);
 
-
     IpPortPair origin(ip_header->daddr, ntohs(*dst_port));
     handle->flow_manager.assign_output(packet);
     ip_header->daddr = handle->destination.ip;
     *dst_port = htons(handle->destination.port);
     ip_header->check = IpUtil::get_ip_checksum(ip_header);
+    *check = 0;
     *check = TransportUtil::get_tcp_udp_checksum(ip_header, packet + ip_header->ihl * 4, ip_header->protocol, packet_length);
 
     stringstream info_message;
