@@ -11,8 +11,6 @@ public:
 
     static void on_info(std::string message);
     static void on_warnig(std::string message);
-    static void on_error(std::string message);
-    static void on_fatal(std::string message);
-
+    static void on_error(int code);
 };
 }

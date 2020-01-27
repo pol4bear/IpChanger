@@ -21,12 +21,10 @@ void LogManager::on_warnig(string message) {
     LOG(WARNING) << message;
 }
 
-void LogManager::on_error(string message) {
-    LOG(ERROR) << message;
-}
+void LogManager::on_error(int code) {
+    switch(code) {
 
-void LogManager::on_fatal(string message) {
-    LOG(FATAL) << message;
+    }
 }
 }
 
