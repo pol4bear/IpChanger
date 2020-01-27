@@ -1,6 +1,7 @@
 #pragma once
 
 #include <glog/logging.h>
+#include "NetfilterManager.h"
 
 namespace pol4b {
 class LogManager
