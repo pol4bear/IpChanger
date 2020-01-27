@@ -18,40 +18,34 @@ int IpChanger::cb_input(nfq_q_handle *queue_handle, nfgenmsg *message, nfq_data 
     else if (ntohs(packet_header->hw_protocol) != ETHERTYPE_IP) return nfq_set_verdict(queue_handle, ntohl(packet_header->packet_id), NF_ACCEPT, 0, nullptr);
 
     iphdr *ip_header = (iphdr*)packet;
-    if(!(Ip(ip_header->saddr) == "192.168.0.254"))  return nfq_set_verdict(queue_handle, ntohl(packet_header->packet_id), NF_ACCEPT, 0, nullptr);
+    uint16_t *src_port = nullptr, *check = nullptr;
     if (ip_header->protocol == IPPROTO_TCP) {
         tcphdr *tcp_header = TcpUtil::get_tcp_header(ip_header);
-        uint32_t payload_length = TcpUtil::get_tcp_payload_length(ip_header, tcp_header);
-
-        if (ip_header->saddr != handle->destination.ip || ntohs(tcp_header->source) != handle->destination.port) return nfq_set_verdict(queue_handle, ntohl(packet_header->packet_id), NF_ACCEPT, 0, nullptr);
-
-        handle->flow_manager.assign_input(packet);
-
-        IpPortPair destination;
-        if (handle->flow_manager.get_original_destination(IpPortPair(ip_header->saddr, tcp_header->source), destination)) {
-            ip_header->daddr = destination.ip;
-            tcp_header->dest = htons(destination.port);
-            ip_header->check = IpUtil::get_ip_checksum(ip_header);
-            tcp_header->check = TcpUtil::get_tcp_checksum(ip_header, tcp_header, packet_length);
-        }
+        src_port = &tcp_header->source;
+        check = &tcp_header->check;
     }
     else if(ip_header->protocol == IPPROTO_UDP) {
         udphdr *udp_header = UdpUtil::get_udp_header(ip_header);
-        uint32_t payload_length = UdpUtil::get_udp_payload_length(udp_header);
-
-        if (ip_header->saddr != handle->destination.ip || udp_header->source != handle->destination.port) return nfq_set_verdict(queue_handle, ntohl(packet_header->packet_id), NF_ACCEPT, 0, nullptr);
-
-        handle->flow_manager.assign_input(packet);
-
-        IpPortPair destination;
-        if (handle->flow_manager.get_original_destination(IpPortPair(ip_header->saddr, udp_header->source), destination)) {
-            ip_header->daddr = destination.ip;
-            udp_header->dest = htons(destination.port);
-            ip_header->check = IpUtil::get_ip_checksum(ip_header);
-            udp_header->check = UdpUtil::get_udp_checksum(ip_header, udp_header, packet_length);
-        }
+        src_port = &udp_header->source;
+        check = &udp_header->check;
     }
     else return nfq_set_verdict(queue_handle, ntohl(packet_header->packet_id), NF_ACCEPT, 0, nullptr);
+
+    if (ip_header->saddr != handle->destination.ip || *src_port != handle->destination.port) return nfq_set_verdict(queue_handle, ntohl(packet_header->packet_id), NF_ACCEPT, 0, nullptr);
+    handle->flow_manager.assign_input(packet);
+
+    IpPortPair origin(ip_header->saddr, ntohs(*src_port));
+    IpPortPair destination;
+    if (handle->flow_manager.get_original_destination(origin, destination)) {
+        ip_header->daddr = destination.ip;
+        *src_port = htons(destination.port);
+        ip_header->check = IpUtil::get_ip_checksum(ip_header);
+        *check = TransportUtil::get_tcp_udp_checksum(ip_header, packet + ip_header->ihl * 4, ip_header->protocol, packet_length);
+    }
+
+    stringstream info_message;
+    info_message <<"[Input] Source Changed " << origin.ip.to_string() << ":" << to_string(origin.port) << " -> " << destination.ip.to_string() << ":" << to_string(destination.port);
+    handle->on_info(info_message.str());
 
     return nfq_set_verdict(queue_handle, ntohl(packet_header->packet_id), NF_ACCEPT, packet_length, packet);
 }
@@ -68,26 +62,30 @@ int IpChanger::cb_output(nfq_q_handle *queue_handle, nfgenmsg *message, nfq_data
     else if (ntohs(packet_header->hw_protocol) != ETHERTYPE_IP) return nfq_set_verdict(queue_handle, ntohl(packet_header->packet_id), NF_ACCEPT, 0, nullptr);
 
     iphdr *ip_header = (iphdr*)packet;
-    if(!(Ip(ip_header->daddr) == "175.213.35.39"))  return nfq_set_verdict(queue_handle, ntohl(packet_header->packet_id), NF_ACCEPT, 0, nullptr);
+    uint16_t *dst_port = nullptr, *check = nullptr;
     if (ip_header->protocol == IPPROTO_TCP) {
         tcphdr *tcp_header = TcpUtil::get_tcp_header(ip_header);
-        uint32_t payload_length = TcpUtil::get_tcp_payload_length(ip_header, tcp_header);
-        handle->flow_manager.assign_output(packet);
-        ip_header->daddr = handle->destination.ip;
-        tcp_header->dest = htons(handle->destination.port);
-        ip_header->check = IpUtil::get_ip_checksum(ip_header);
-        tcp_header->check = TcpUtil::get_tcp_checksum(ip_header, tcp_header, packet_length);
+        dst_port = &tcp_header->dest;
+        check = &tcp_header->check;
     }
     else if(ip_header->protocol == IPPROTO_UDP) {
         udphdr *udp_header = UdpUtil::get_udp_header(ip_header);
-        uint32_t payload_length = UdpUtil::get_udp_payload_length(udp_header);
-        handle->flow_manager.assign_output(packet);
-        ip_header->daddr = handle->destination.ip;
-        udp_header->dest = htons(handle->destination.port);
-        ip_header->check = IpUtil::get_ip_checksum(ip_header);
-        udp_header->check = UdpUtil::get_udp_checksum(ip_header, udp_header, packet_length);
+        dst_port = &udp_header->dest;
+        check = &udp_header->check;
     }
     else return nfq_set_verdict(queue_handle, ntohl(packet_header->packet_id), NF_ACCEPT, 0, nullptr);
+
+
+    IpPortPair origin(ip_header->daddr, ntohs(*dst_port));
+    handle->flow_manager.assign_output(packet);
+    ip_header->daddr = handle->destination.ip;
+    *dst_port = htons(handle->destination.port);
+    ip_header->check = IpUtil::get_ip_checksum(ip_header);
+    *check = TransportUtil::get_tcp_udp_checksum(ip_header, packet + ip_header->ihl * 4, ip_header->protocol, packet_length);
+
+    stringstream info_message;
+    info_message <<"[Output] Destination Changed " << origin.ip.to_string() << ":" << to_string(origin.port) << " -> " << handle->destination.ip.to_string() << ":" << to_string(handle->destination.port);
+    handle->on_info(info_message.str());
 
     return nfq_set_verdict(queue_handle, ntohl(packet_header->packet_id), NF_ACCEPT, packet_length, packet);
 }
