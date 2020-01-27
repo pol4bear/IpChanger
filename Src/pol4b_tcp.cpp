@@ -4,18 +4,8 @@ using namespace std;
 
 namespace pol4b {
 uint16_t TcpUtil::get_tcp_checksum(iphdr *ip_header, tcphdr *tcp_header, uint32_t packet_length) {
-    uint32_t sum = 0;
-    uint32_t tcp_length = packet_length - ip_header->ihl * 4;
-
     tcp_header->check = 0;
-    sum += (ip_header->saddr >> 16) & 0xFFFF;
-    sum += (ip_header->saddr) & 0xFFFF;
-    sum += (ip_header->daddr >> 16) & 0xFFFF;
-    sum += (ip_header->daddr) & 0xFFFF;
-    sum += htons(IPPROTO_TCP);
-    sum += htons(tcp_length);
-
-    return NetworkUtil::compute_checksum(sum, (uint16_t *)tcp_header, tcp_length);
+    return TransportUtil::get_tcp_udp_checksum(ip_header, (uint8_t*)tcp_header, IPPROTO_TCP, packet_length);
 }
 
 tcphdr *TcpUtil::get_tcp_header(iphdr *ip_header) { return (tcphdr*)((uint8_t*)ip_header + ip_header->ihl * 4); }
